@@ -11,11 +11,9 @@ st.set_page_config(
 
 sns.set(style="whitegrid")
 
-# Load data
 df = pd.read_csv("dashboard/main_data.csv")
 df["dteday"] = pd.to_datetime(df["dteday"])
 
-# Mapping label agar lebih mudah dibaca
 weather_map = {
     1: "Clear",
     2: "Mist/Cloudy",
@@ -31,17 +29,13 @@ workingday_map = {
 df["weather_label"] = df["weathersit"].map(weather_map)
 df["workingday_label"] = df["workingday"].map(workingday_map)
 
-# Sidebar filter
 st.sidebar.header("Filter Data")
-
-min_date = df["dteday"].min()
-max_date = df["dteday"].max()
 
 date_range = st.sidebar.date_input(
     "Pilih Rentang Tanggal",
-    value=[min_date, max_date],
-    min_value=min_date,
-    max_value=max_date
+    value=[df["dteday"].min(), df["dteday"].max()],
+    min_value=df["dteday"].min(),
+    max_value=df["dteday"].max()
 )
 
 selected_weather = st.sidebar.multiselect(
@@ -50,7 +44,7 @@ selected_weather = st.sidebar.multiselect(
     default=df["weather_label"].unique()
 )
 
-selected_workingday = st.sidebar.multiselect(
+selected_day = st.sidebar.multiselect(
     "Pilih Jenis Hari",
     options=df["workingday_label"].unique(),
     default=df["workingday_label"].unique()
@@ -67,25 +61,19 @@ if len(date_range) == 2:
 
 filtered_df = filtered_df[
     (filtered_df["weather_label"].isin(selected_weather)) &
-    (filtered_df["workingday_label"].isin(selected_workingday))
+    (filtered_df["workingday_label"].isin(selected_day))
 ].copy()
 
-# Title
 st.title("🚲 Bike Sharing Dashboard")
-st.write(
-    "Dashboard interaktif untuk menganalisis penyewaan sepeda berdasarkan waktu, cuaca, hari kerja, dan kategori suhu."
-)
+st.write("Dashboard interaktif untuk menganalisis penyewaan sepeda berdasarkan waktu, cuaca, hari kerja, dan kategori suhu.")
 
-# KPI
 col1, col2, col3 = st.columns(3)
-
 col1.metric("Total Penyewaan", f"{filtered_df['cnt'].sum():,}")
 col2.metric("Rata-rata Penyewaan Harian", round(filtered_df["cnt"].mean(), 2))
 col3.metric("Penyewaan Tertinggi", f"{filtered_df['cnt'].max():,}")
 
 st.divider()
 
-# Tren penyewaan
 st.subheader("Tren Penyewaan Sepeda Harian")
 
 fig, ax = plt.subplots(figsize=(12, 5))
@@ -95,15 +83,9 @@ ax.set_xlabel("Tanggal")
 ax.set_ylabel("Jumlah Penyewaan")
 st.pyplot(fig)
 
-# Pertanyaan 1
-st.subheader("Pengaruh Kondisi Cuaca terhadap Penyewaan Sepeda")
+st.subheader("Pertanyaan 1: Pengaruh Kondisi Cuaca terhadap Penyewaan Sepeda")
 
-weather_agg = (
-    filtered_df.groupby("weather_label")["cnt"]
-    .mean()
-    .sort_values(ascending=False)
-    .reset_index()
-)
+weather_agg = filtered_df.groupby("weather_label")["cnt"].mean().sort_values(ascending=False).reset_index()
 
 fig, ax = plt.subplots(figsize=(8, 5))
 sns.barplot(
@@ -121,20 +103,20 @@ ax.set_ylabel("Rata-rata Jumlah Penyewaan")
 plt.xticks(rotation=15)
 st.pyplot(fig)
 
-st.write("""
-**Insight:**  
-Kondisi cuaca memiliki pengaruh terhadap jumlah penyewaan sepeda. 
-Pengguna cenderung lebih banyak menyewa sepeda pada kondisi cuaca yang lebih baik.
+best_weather = weather_agg.iloc[0]
+worst_weather = weather_agg.iloc[-1]
+
+st.write(f"""
+**Insight Pertanyaan 1:**  
+Kondisi cuaca dengan rata-rata penyewaan tertinggi adalah **{best_weather['weather_label']}**
+dengan rata-rata **{best_weather['cnt']:.2f}** penyewaan.  
+Kondisi cuaca dengan rata-rata penyewaan terendah adalah **{worst_weather['weather_label']}**
+dengan rata-rata **{worst_weather['cnt']:.2f}** penyewaan.
 """)
 
-# Pertanyaan 2
-st.subheader("Perbandingan Penyewaan antara Hari Kerja dan Hari Libur")
+st.subheader("Pertanyaan 2: Hari Kerja vs Hari Libur")
 
-workingday_agg = (
-    filtered_df.groupby("workingday_label")["cnt"]
-    .mean()
-    .reset_index()
-)
+workingday_agg = filtered_df.groupby("workingday_label")["cnt"].mean().sort_values(ascending=False).reset_index()
 
 fig, ax = plt.subplots(figsize=(8, 5))
 sns.barplot(
@@ -146,18 +128,22 @@ sns.barplot(
     legend=False,
     ax=ax
 )
-ax.set_title("Rata-rata Penyewaan Hari Kerja vs Hari Libur")
+ax.set_title("Rata-rata Penyewaan Hari Kerja dan Hari Libur")
 ax.set_xlabel("Jenis Hari")
 ax.set_ylabel("Rata-rata Jumlah Penyewaan")
 st.pyplot(fig)
 
-st.write("""
-**Insight:**  
-Perbandingan ini menunjukkan apakah sepeda lebih banyak digunakan pada hari kerja atau hari libur.
-Informasi ini berguna untuk mengatur distribusi sepeda dan operasional layanan.
+best_day = workingday_agg.iloc[0]
+worst_day = workingday_agg.iloc[-1]
+
+st.write(f"""
+**Insight Pertanyaan 2:**  
+Jenis hari dengan rata-rata penyewaan tertinggi adalah **{best_day['workingday_label']}**
+dengan rata-rata **{best_day['cnt']:.2f}** penyewaan.  
+Jenis hari dengan rata-rata penyewaan terendah adalah **{worst_day['workingday_label']}**
+dengan rata-rata **{worst_day['cnt']:.2f}** penyewaan.
 """)
 
-# Analisis lanjutan binning suhu
 st.subheader("Analisis Lanjutan: Binning Suhu")
 
 filtered_df["temp_category"] = pd.cut(
@@ -166,11 +152,7 @@ filtered_df["temp_category"] = pd.cut(
     labels=["Low", "Medium", "High"]
 )
 
-temp_agg = (
-    filtered_df.groupby("temp_category", observed=True)["cnt"]
-    .mean()
-    .reset_index()
-)
+temp_agg = filtered_df.groupby("temp_category", observed=True)["cnt"].mean().reset_index()
 
 fig, ax = plt.subplots(figsize=(8, 5))
 sns.barplot(
@@ -187,20 +169,28 @@ ax.set_xlabel("Kategori Suhu")
 ax.set_ylabel("Rata-rata Jumlah Penyewaan")
 st.pyplot(fig)
 
-st.write("""
+best_temp = temp_agg.sort_values("cnt", ascending=False).iloc[0]
+
+st.write(f"""
 **Insight Analisis Lanjutan:**  
-Analisis ini menggunakan teknik binning, yaitu mengelompokkan suhu ke dalam kategori Low, Medium, dan High.
-Tujuannya adalah melihat bagaimana kategori suhu memengaruhi jumlah penyewaan sepeda.
+Kategori suhu dengan rata-rata penyewaan tertinggi adalah **{best_temp['temp_category']}**
+dengan rata-rata **{best_temp['cnt']:.2f}** penyewaan.  
+Analisis ini menggunakan teknik **binning**, yaitu pengelompokan suhu ke dalam kategori Low, Medium, dan High tanpa algoritma machine learning.
 """)
 
-# Conclusion
 st.divider()
+
 st.subheader("Conclusion")
 
-st.write("""
-1. Kondisi cuaca memengaruhi jumlah penyewaan sepeda.
-2. Terdapat perbedaan jumlah penyewaan antara hari kerja dan hari libur.
-3. Suhu juga berpengaruh terhadap tingkat penggunaan sepeda.
+st.write(f"""
+1. Kondisi cuaca memengaruhi jumlah penyewaan sepeda. Kondisi **{best_weather['weather_label']}**
+memiliki rata-rata penyewaan tertinggi sebesar **{best_weather['cnt']:.2f}**.
+
+2. Jenis hari juga memengaruhi penyewaan. **{best_day['workingday_label']}**
+memiliki rata-rata penyewaan tertinggi sebesar **{best_day['cnt']:.2f}**.
+
+3. Berdasarkan analisis binning suhu, kategori suhu **{best_temp['temp_category']}**
+memiliki rata-rata penyewaan tertinggi sebesar **{best_temp['cnt']:.2f}**.
 """)
 
 st.subheader("Recommendation Action Item")
@@ -208,5 +198,6 @@ st.subheader("Recommendation Action Item")
 st.write("""
 - Menambah ketersediaan sepeda pada periode dengan permintaan tinggi.
 - Mengoptimalkan distribusi sepeda berdasarkan kondisi cuaca dan jenis hari.
-- Memberikan promo saat cuaca kurang baik atau saat permintaan rendah.
+- Memberikan promo saat cuaca buruk atau saat permintaan rendah.
+- Menyesuaikan strategi operasional berdasarkan pola suhu dan tren penyewaan.
 """)
